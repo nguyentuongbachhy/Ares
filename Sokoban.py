@@ -30,7 +30,8 @@ class Warehouse:
         self.from_lines(lines)
 
     def load_warehouse(self, filepath: str):
-        map = MapParser()(filename=filepath)
+        map, weights = MapParser()(filename=filepath)
+        self.weights = weights
         lines = [''.join(row) for row in map]
         self.from_lines(lines)
 
@@ -56,16 +57,6 @@ class Warehouse:
         self.nrows = len(canonical_lines)
         self.extract_locations(canonical_lines)
 
-        try:
-            W = [int(v) for v in lines[0].split]
-        except:
-            W = None
-
-        if W is not None and len(W) > 0:
-            assert len(W) == len(self.boxes)
-            self.weights = W
-        else:
-            self.weights = [0] * len(self.boxes)
 
     def save_warehouse(self, filepath: str):
         with open(filepath, 'w') as f:

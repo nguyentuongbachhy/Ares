@@ -23,7 +23,9 @@ class MapParser:
         [width, height] = lines[0].split(' ')
         map = [[' ' for _ in range(int(width))] for _ in range(int(height))]
 
-        player_coordinate = lines[-1].split(' ')
+        player_coordinate = lines[-2].split(' ')
+        weights = [int(weight) for weight in lines[-1].split(' ')]
+
 
         if map[int(player_coordinate[0]) - 1][int(player_coordinate[1]) - 1] == ' ':
             map[int(player_coordinate[0]) - 1][int(player_coordinate[1]) - 1] = '@'
@@ -35,7 +37,7 @@ class MapParser:
         self.parse_line(lines[2], map, '$', '*')
         self.parse_line(lines[3], map, '.', '*')
 
-        return map
+        return map, weights
 
 
 
