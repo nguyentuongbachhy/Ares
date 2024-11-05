@@ -157,18 +157,18 @@ class MainGame:
         self.font = tkFont.Font(family="ArcadeGamer", size=15)
         self.image_dict = {
             'ares': {
-                'go_ahead': [self.load_image(f'images/ares/go_ahead/{i}.png', (35, 35)) for i in range(4)],
-                'go_back': [self.load_image(f'images/ares/go_back/{i}.png', (35, 35)) for i in range(4)],
-                'go_left': [self.load_image(f'images/ares/go_left/{i}.png', (35, 35)) for i in range(4)],
-                'go_right': [self.load_image(f'images/ares/go_right/{i}.png', (35, 35)) for i in range(4)],
-                'stand': self.load_image('images/ares/stand/0.png', (35, 35)),
+                'go_ahead': [self.load_image(f'images/ares/go_ahead/{i}.png', (50, 50)) for i in range(4)],
+                'go_back': [self.load_image(f'images/ares/go_back/{i}.png', (50, 50)) for i in range(4)],
+                'go_left': [self.load_image(f'images/ares/go_left/{i}.png', (50, 50)) for i in range(4)],
+                'go_right': [self.load_image(f'images/ares/go_right/{i}.png', (50, 50)) for i in range(4)],
+                'stand': self.load_image('images/ares/stand/0.png', (50, 50)),
             },
-            'wall': self.load_image('images/cell/wall.png', (35, 35)),
-            'box': self.load_image('images/cell/box.png', (35, 35)),
-            'box_on_target': self.load_image('images/cell/right_box.png', (35, 35)),
-            'target': self.load_image('images/cell/dock.png', (35, 35)),
-            'in_space': self.load_image('images/cell/in_space.png', (35, 35)),
-            'out_space': self.load_image('images/cell/out_space.png', (35, 35))
+            'wall': self.load_image('images/cell/wall.png', (50, 50)),
+            'box': self.load_image('images/cell/box.png', (50, 50)),
+            'box_on_target': self.load_image('images/cell/right_box.png', (50, 50)),
+            'target': self.load_image('images/cell/dock.png', (50, 50)),
+            'in_space': self.load_image('images/cell/in_space.png', (50, 50)),
+            'out_space': self.load_image('images/cell/out_space.png', (50, 50))
         }
         self.direction_offset = {
             'Left': (-1, 0),
@@ -184,15 +184,16 @@ class MainGame:
             w = 0
         return w
     
-    def make_cell(self, cell_image, box_weight=None):
+    def make_cell(self, cell_image, row, col, box_weight = None):
         canvas = tk.Canvas(self.frame,
-                           width=35,
-                           height=35,
+                           width=50,
+                           height=50,
                            highlightthickness=0,
                            bd=0)
         canvas.create_image(0, 0, anchor=tk.NW, image=cell_image)
         if box_weight != None:
-            canvas.create_text(15, 15, text=str(box_weight), fill='black', font=(self.font, 15, 'bold'))
+            canvas.create_text(25, 25, text=str(box_weight), fill='black', font=(self.font, 15, 'bold'))
+        canvas.grid(row=row, column=col)
         return canvas
 
     def clear_level(self):
@@ -214,29 +215,28 @@ class MainGame:
             del self.cells[(x, y)]
 
     def fresh_display(self):
-        for x, y in self.warehouse.walls:
-            self.cells[(x, y)] = self.make_cell(self.image_dict['wall'])
-            self.cells[(x, y)].grid(row=y,column=x)
-        
-        for x, y in self.warehouse.targets:
-            self.cells[(x, y)] = self.make_cell(self.image_dict['target'])
-            self.cells[(x, y)].grid(row=y,column=x)
-
-        for x, y in self.warehouse.boxes:
-            if (x, y) in self.warehouse.targets:
-                self.clean_cell(x, y)
-                self.cells[(x, y)] = self.make_cell(self.image_dict['box_on_target'], self.get_box_weight(x, y))
-                self.cells[(x, y)].grid(row=y,column=x)
-            else:
-                self.cells[(x, y)] = self.make_cell(self.image_dict['box'], self.get_box_weight(x, y))
-                self.cells[(x, y)].grid(row=y,column=x)
-
-
-        x, y = self.warehouse.worker
-        if (x, y) in self.warehouse.targets:
-            self.cells[(x, y)].destroy()
-        self.cells[(x, y)] = self.make_cell(self.image_dict['ares']['stand'])
-        self.cells[(x, y)].grid(row=y,column=x)
+        for row in range(self.warehouse.nrows):
+            for col in range(self.warehouse.ncols):
+                position = (col, row)
+                
+                if position in self.warehouse.walls:
+                    # Draw wall cell
+                    self.cells[position] = self.make_cell(self.image_dict['wall'], row, 500 + col)
+                elif position in self.warehouse.targets:
+                    # Draw target cell
+                    self.cells[position] = self.make_cell(self.image_dict['target'], row, 500 + col)
+                elif position in self.warehouse.boxes:
+                    # Draw box or box on target
+                    if position in self.warehouse.targets:
+                        self.cells[position] = self.make_cell(self.image_dict['box_on_target'], row, 500 + col, self.get_box_weight(col, row))
+                    else:
+                        self.cells[position] = self.make_cell(self.image_dict['box'], row, 500 + col, self.get_box_weight(col, row))
+                elif position == self.warehouse.worker:
+                    # Draw worker position
+                    self.cells[position] = self.make_cell(self.image_dict['ares']['stand'], row, 500 + col)
+                else:
+                    # Draw in_space for empty cells
+                    self.cells[position] = self.make_cell(self.image_dict['in_space'], row, 500 + col)
 
         self.frame.pack(side='right', fill=tk.BOTH, expand=True)
 
@@ -253,14 +253,15 @@ class MainGame:
         
         self.clean_cell(x, y)
         self.clean_cell(next_x, next_y)
-        self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['ares']['stand'])
-        self.cells[(next_x, next_y)].grid(row=next_y,column=next_x)
+
+        self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['ares']['stand'], next_y, 500 + next_x)
 
         self.warehouse.worker = (next_x, next_y)
 
         if (x, y) in self.warehouse.targets:
-            self.cells[(x, y)] = self.make_cell(self.image_dict['target'])
-            self.cells[(x, y)].grid(row=y,column=x)
+            self.cells[(x, y)] = self.make_cell(self.image_dict['target'], y, 500 + x)
+        else:
+            self.cells[(x, y)] = self.make_cell(self.image_dict['in_space'], y, 500 + x)
 
         puzzle_solve = all(z in self.warehouse.targets for z in self.warehouse.boxes)
 
@@ -268,22 +269,35 @@ class MainGame:
             print('Victory')
         
         self.frame.pack()
-        
+
     def try_move_box(self, location: tuple, next_location: tuple):
         x, y = location
         next_x, next_y = next_location
 
         assert (x, y) in self.warehouse.boxes
+
         if (next_x, next_y) not in self.warehouse.walls and (next_x, next_y) not in self.warehouse.boxes:
             if (next_x, next_y) in self.cells:
-                assert (next_x, next_y) in self.warehouse.targets
                 self.clean_cell(next_x, next_y)
 
+            # Draw the new box position
             if (next_x, next_y) in self.warehouse.targets:
-                self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['box_on_target'], self.get_box_weight(x, y))
+                # Box moved to a target cell
+                self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['box_on_target'], next_y, 500 + next_x, self.get_box_weight(x, y))
             else:
-                self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['box'], self.get_box_weight(x, y))
-            self.cells[(next_x, next_y)].grid(row=next_y,column=next_x)
+                # Box moved to an empty cell
+                self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['box'], next_y, 500 + next_x, self.get_box_weight(x, y))
+            
+            # Clean up old box position
+            self.clean_cell(x, y)
+            if (x, y) in self.warehouse.targets:
+                # Restore target cell if the box was originally on a target
+                self.cells[(x, y)] = self.make_cell(self.image_dict['target'], y, 500 + x)
+            else:
+                # Otherwise, set the cell to an in_space cell
+                self.cells[(x, y)] = self.make_cell(self.image_dict['in_space'], y, 500 + x)
+
+            # Update box position in warehouse state
             bi = self.warehouse.boxes.index((x, y))
             self.warehouse.boxes[bi] = (next_x, next_y)
 
@@ -319,21 +333,16 @@ class GamePage:
         self.app_root_folder = app_root_folder
         self.image = self.load_image(map_file, resize=(1000, 600))
 
-        self.frame = tk.Frame(self.root, width=1000, height=600)
-        self.frame.pack(fill='both', expand=True)
+        self.frame = tk.Canvas(self.root, width=1000, height=600)
 
-        self.left_frame = tk.Frame(self.frame, width=400, height=600, bg='')
-        self.left_frame.pack(side='left', fill=tk.BOTH, expand=True)
-        self.left_background = tk.Label(self.left_frame, image=self.image)
-        self.left_background.place(x=0,y=0,relwidth=1,relheight=1)
+        self.frame.pack(fill=tk.BOTH, expand=True)
 
+        self.background_label = tk.Label(self.frame, image=self.image)
+        self.background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
-        self.right_frame = tk.Frame(self.frame, width=600, height=600, bg='')
-        self.right_frame.pack(side='right', fill=tk.BOTH, expand=True)
-        self.right_background = tk.Label(self.right_frame, image=self.image)
-        self.right_background.place(x=0,y=0,relwidth=1,relheight=1)
 
         self.method = None
+
 
         self.draw_game_controls()
         self.draw_map()
@@ -347,46 +356,33 @@ class GamePage:
 
         return ImageTk.PhotoImage(image)
 
-    def crop_image_by_ratio(self, image, left_ratio=0.4, right_ratio=0.6):
-        width, height = image.size
-
-        # Cắt phần trái chiếm 40%
-        left_box = (0, 0, int(width * left_ratio), height)
-        left_image = image.crop(left_box)
-
-        # Cắt phần phải chiếm 60%
-        right_box = (int(width * left_ratio), 0, int(width * right_ratio), height)
-        right_image = image.crop(right_box)
-
-        return ImageTk.PhotoImage(left_image), ImageTk.PhotoImage(right_image)
-
-    def init_info_panel(self):
-        title_label = tk.Label(self.left_frame, 
-                              text="Game Information", 
-                              font=('Arial', 16, 'bold'),
-                              bg='#f0f0f0')
-        title_label.pack(pady=20)
+    # def init_info_panel(self):
+    #     title_label = tk.Label(self.frame, 
+    #                           text="Game Information", 
+    #                           font=('Arial', 16, 'bold'),
+    #                           bg='#f0f0f0')
+    #     title_label.pack(pady=20)
         
-        info_frame = tk.Frame(self.left_frame, bg='#f0f0f0')
-        info_frame.pack(fill=tk.X, padx=20)
+    #     info_frame = tk.Frame(self.left_frame, bg='#f0f0f0')
+    #     info_frame.pack(fill=tk.X, padx=20)
         
-        level_label = tk.Label(info_frame, 
-                             text="Current Level: 1",
-                             font=('Arial', 12),
-                             bg='#f0f0f0')
-        level_label.pack(anchor='w', pady=5)
+    #     level_label = tk.Label(info_frame, 
+    #                          text="Current Level: 1",
+    #                          font=('Arial', 12),
+    #                          bg='#f0f0f0')
+    #     level_label.pack(anchor='w', pady=5)
         
-        self.moves_label = tk.Label(info_frame,
-                                  text="Moves: 0",
-                                  font=('Arial', 12),
-                                  bg='#f0f0f0')
-        self.moves_label.pack(anchor='w', pady=5)
+    #     self.moves_label = tk.Label(info_frame,
+    #                               text="Moves: 0",
+    #                               font=('Arial', 12),
+    #                               bg='#f0f0f0')
+    #     self.moves_label.pack(anchor='w', pady=5)
         
-        self.method_label = tk.Label(info_frame,
-                                   text="Selected Method: None",
-                                   font=('Arial', 12),
-                                   bg='#f0f0f0')
-        self.method_label.pack(anchor='w', pady=5)
+    #     self.method_label = tk.Label(info_frame,
+    #                                text="Selected Method: None",
+    #                                font=('Arial', 12),
+    #                                bg='#f0f0f0')
+    #     self.method_label.pack(anchor='w', pady=5)
 
 
     def draw_game_controls(self):
@@ -444,8 +440,7 @@ class GamePage:
     def draw_map(self):
         warehouse = Warehouse()
         warehouse.load_warehouse(r"./warehouses/input_10_10_2_4.txt")
-        self.init_info_panel()
-        self.main_game = MainGame(self.right_frame, {}, self.root, self.app_root_folder, warehouse)
+        self.main_game = MainGame(self.frame, {}, self.root, self.app_root_folder, warehouse)
         self.root.bind_all("<Key>", self.main_game.key_handler)
         self.main_game.start_level()
 
@@ -575,6 +570,7 @@ if __name__ == '__main__':
         False,
         tk.PhotoImage(file=os.path.join(app_root_folder, 'images/ares/stand/0.png'))
     )
+    root.wm_attributes('-transparentcolor', 'gray')
     home_page = Home(root, app_root_folder)
 
     root.mainloop()
