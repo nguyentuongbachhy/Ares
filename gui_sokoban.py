@@ -146,7 +146,7 @@ class OptionsPage:
 
 class MainGame:
     def __init__(self, frame: tk.Frame, cells: dict, root, app_root_folder: str, warehouse_path: str):
-        self.parent_frame = frame  # Khung chứa chính
+        self.parent_frame = frame
         self.warehouse_path = warehouse_path
         self.warehouse = self.load_warehouse(self.warehouse_path)
         self.cells = cells
@@ -159,11 +159,10 @@ class MainGame:
         grid_width = self.warehouse.ncols * self.cell_size
         grid_height = self.warehouse.nrows * self.cell_size
 
-        self.grid_frame = tk.Frame(self.parent_frame, width=grid_width, height=grid_height)  # Khung con sẽ dùng grid
+        self.grid_frame = tk.Frame(self.parent_frame, width=grid_width, height=grid_height)
         self.grid_frame.place(x = 900 - grid_width, y=0, width=grid_width, height=grid_height)
 
 
-        # Dictionary chứa các hình ảnh
         self.image_dict = {
             'ares': {
                 'go_ahead': [self.load_image(f'images/ares/go_ahead/{i}.png', (50, 50)) for i in range(4)],
@@ -181,10 +180,10 @@ class MainGame:
         }
         
         self.direction_offset = {
-            'Left': (-1, 0),
-            'Right': (1, 0),
-            'Up': (0, -1),
-            'Down': (0, 1)
+            'l': (-1, 0),
+            'r': (1, 0),
+            'u': (0, -1),
+            'd': (0, 1)
         }
 
     def load_warehouse(self, warehouse_path: str):
@@ -210,7 +209,7 @@ class MainGame:
                            bd=0)
         canvas.create_image(0, 0, anchor=tk.NW, image=cell_image)
         if box_weight is not None:
-            canvas.create_text(25, 25, text=str(box_weight), fill='black', font=(self.font, 15, 'bold'))
+            canvas.create_text(25, 25, text=str(box_weight), fill='red', font=(self.font, 15, 'bold'))
         canvas.grid(row=row, column=col)
         return canvas
 
@@ -326,11 +325,16 @@ class MainGame:
 
         print(f"Analysis took {t1 - t0:.6f} seconds")
         if solution == "Impossible":
+            self.solution = None
             print("No solution found!")
         else:
+            self.solution = solution
             print(f"Solution found with a cost of {total_cost}\n", solution, '\n')
 
-
+    def play_solution(self):
+        if self.solution and len(self.solution) > 0:
+            self.move_player(self.solution.pop(0))
+            self.parent_frame.after(300, self.play_solution)
 
 
 
@@ -349,7 +353,6 @@ class GamePage:
         self.font = tkFont.Font(family="ArcadeGamer", size=15)
         
 
-        # Khung chính
         self.frame = tk.Frame(self.root)
         self.frame.pack(fill=tk.BOTH, expand=True)
 
@@ -367,17 +370,14 @@ class GamePage:
     def get_dominant_color(self, image_path):
         image = Image.open(image_path)
 
-        # Chuyển đổi ảnh sang RGB
         image = image.convert("RGB")
         
-        # Lấy kích thước và pixel
         width, height = image.size
 
         top_half = image.crop((0, 0, width, height // 2))
 
         pixels = top_half.getdata()
         
-        # Tính màu trung bình
         r, g, b = 0, 0, 0
         for pixel in pixels:
             r += pixel[0]
@@ -390,14 +390,11 @@ class GamePage:
             g //= total_pixels
             b //= total_pixels
 
-        # Trả về màu ở định dạng hex
         return f'#{r:02x}{g:02x}{b:02x}'
 
     def hex_to_rgb(self, hex_color):
-        # Nếu màu hex bắt đầu với '#', loại bỏ nó
         hex_color = hex_color.lstrip('#')
         
-        # Chuyển đổi hex thành các giá trị r, g, b
         r = int(hex_color[0:2], 16)
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
@@ -450,9 +447,6 @@ class GamePage:
         self.solve_menu.add_command(label="Plan Action Sequence", command=self.plan_action_sequence, state='disabled')
         self.solve_menu.add_command(label="Play Action Sequence", command=self.play_action_sequence, state='disabled')
 
-        self.plan_action_index = 0
-        self.play_action_index = 1
-        
         solve_button.config(command=lambda: self.solve_menu.post(solve_button.winfo_rootx(), solve_button.winfo_rooty() + solve_button.winfo_height()))
 
         for button in (restart_button, solve_button, quit_button):
@@ -468,8 +462,8 @@ class GamePage:
     def set_method(self, method):
         self.method = method
         self.algorithm_label.config(text=f"ALGORITHM: {self.method}")
-        self.solve_menu.entryconfig(self.plan_action_index, state="normal")
-        self.solve_menu.entryconfig(self.play_action_index, state="normal")
+        self.solve_menu.entryconfig("Plan Action Sequence", state="normal")
+        self.solve_menu.entryconfig("Play Action Sequence", state="normal")
 
     def plan_action_sequence(self):
         if self.method:
@@ -479,6 +473,7 @@ class GamePage:
     def play_action_sequence(self):
         if self.method:
             print("Playing action sequence with", self.method)
+            self.main_game.play_solution()
 
     def restart_game(self):
         print("Game Restarted")
