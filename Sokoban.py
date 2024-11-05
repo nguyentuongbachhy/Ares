@@ -50,7 +50,7 @@ class Warehouse:
         if first_row_brick is None:
             raise ValueError('Warehouse with no walls!')
         
-        canonical_lines = [line[first_col_brick:] 
+        canonical_lines = [line[first_col_brick:]
                            for line in lines[first_row_brick:] if line.find('#') >= 0]
 
         self.ncols = 1 + max(line.rfind('#') for line in canonical_lines)
@@ -113,9 +113,8 @@ class Warehouse:
 filepath = r"./warehouses/input_10_10_2_4.txt"
 
 if __name__ == "__main__":
-    wh = Warehouse()
-    wh.load_warehouse(filepath)
-    print(wh)
+    a = (1, 2)
+    print(a[0], a[1])
 
 
 

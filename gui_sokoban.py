@@ -144,17 +144,26 @@ class OptionsPage:
         self.canvas.destroy()
         GamePage(self.root, self.app_root_folder, map_file)
 
-
 class MainGame:
-    def __init__(self, frame: tk.Frame, cells: dict, root, app_root_folder: str, warehouse: Warehouse):
-        self.frame = frame
-        self.warehouse = warehouse
+    def __init__(self, frame: tk.Frame, cells: dict, root, app_root_folder: str, warehouse_path: str):
+        self.parent_frame = frame  # Khung chứa chính
+        self.warehouse_path = warehouse_path
+        self.warehouse = self.load_warehouse(self.warehouse_path)
         self.cells = cells
         self.root = root
         self.app_root_folder = app_root_folder
         self.solution = None
-        self.warehouse_path = None
         self.font = tkFont.Font(family="ArcadeGamer", size=15)
+        
+        self.cell_size = 50
+        grid_width = self.warehouse.ncols * self.cell_size
+        grid_height = self.warehouse.nrows * self.cell_size
+
+        self.grid_frame = tk.Frame(self.parent_frame, width=grid_width, height=grid_height)  # Khung con sẽ dùng grid
+        self.grid_frame.place(x = 900 - grid_width, y=0, width=grid_width, height=grid_height)
+
+
+        # Dictionary chứa các hình ảnh
         self.image_dict = {
             'ares': {
                 'go_ahead': [self.load_image(f'images/ares/go_ahead/{i}.png', (50, 50)) for i in range(4)],
@@ -170,6 +179,7 @@ class MainGame:
             'in_space': self.load_image('images/cell/in_space.png', (50, 50)),
             'out_space': self.load_image('images/cell/out_space.png', (50, 50))
         }
+        
         self.direction_offset = {
             'Left': (-1, 0),
             'Right': (1, 0),
@@ -177,36 +187,41 @@ class MainGame:
             'Down': (0, 1)
         }
 
+    def load_warehouse(self, warehouse_path: str):
+        try:
+            warehouse = Warehouse()
+            warehouse.load_warehouse(warehouse_path)
+            return warehouse
+        except:
+            return None
+
     def get_box_weight(self, x, y):
         try:
             w = self.warehouse.weights[self.warehouse.boxes.index((x, y))]
         except:
             w = 0
         return w
-    
-    def make_cell(self, cell_image, row, col, box_weight = None):
-        canvas = tk.Canvas(self.frame,
+
+    def make_cell(self, cell_image, row, col, box_weight=None):
+        canvas = tk.Canvas(self.grid_frame,
                            width=50,
                            height=50,
                            highlightthickness=0,
                            bd=0)
         canvas.create_image(0, 0, anchor=tk.NW, image=cell_image)
-        if box_weight != None:
+        if box_weight is not None:
             canvas.create_text(25, 25, text=str(box_weight), fill='black', font=(self.font, 15, 'bold'))
         canvas.grid(row=row, column=col)
         return canvas
 
     def clear_level(self):
-        if self.frame:
-            self.frame.destroy()
-        self.frame = tk.Frame(self.root)
-        self.warehouse = Warehouse()
-        self.cells = dict()
-        
+        for cell in self.cells.values():
+            cell.destroy()
+        self.cells.clear()
+        self.warehouse = self.load_warehouse(self.warehouse_path)
 
     def start_level(self):
-        self.root.title(f"Ares's Adventure v{__version__}")
-        self.root.geometry('1000x600')
+        self.root.title(f"Ares's Adventure - {self.warehouse_path.split('/')[-1].split('.')[0]}")
         self.fresh_display()
 
     def clean_cell(self, x, y):
@@ -218,27 +233,21 @@ class MainGame:
         for row in range(self.warehouse.nrows):
             for col in range(self.warehouse.ncols):
                 position = (col, row)
-                
-                if position in self.warehouse.walls:
-                    # Draw wall cell
-                    self.cells[position] = self.make_cell(self.image_dict['wall'], row, 500 + col)
-                elif position in self.warehouse.targets:
-                    # Draw target cell
-                    self.cells[position] = self.make_cell(self.image_dict['target'], row, 500 + col)
-                elif position in self.warehouse.boxes:
-                    # Draw box or box on target
-                    if position in self.warehouse.targets:
-                        self.cells[position] = self.make_cell(self.image_dict['box_on_target'], row, 500 + col, self.get_box_weight(col, row))
-                    else:
-                        self.cells[position] = self.make_cell(self.image_dict['box'], row, 500 + col, self.get_box_weight(col, row))
-                elif position == self.warehouse.worker:
-                    # Draw worker position
-                    self.cells[position] = self.make_cell(self.image_dict['ares']['stand'], row, 500 + col)
-                else:
-                    # Draw in_space for empty cells
-                    self.cells[position] = self.make_cell(self.image_dict['in_space'], row, 500 + col)
 
-        self.frame.pack(side='right', fill=tk.BOTH, expand=True)
+                if position in self.warehouse.walls:
+                    self.cells[position] = self.make_cell(self.image_dict['wall'], row, col)
+                elif position in self.warehouse.targets:
+                    self.cells[position] = self.make_cell(self.image_dict['target'], row, col)
+                elif position in self.warehouse.boxes:
+                    if position in self.warehouse.targets:
+                        self.cells[position] = self.make_cell(self.image_dict['box_on_target'], row, col, self.get_box_weight(col, row))
+                    else:
+                        self.cells[position] = self.make_cell(self.image_dict['box'], row, col, self.get_box_weight(col, row))
+                elif position == self.warehouse.worker:
+                    self.cells[position] = self.make_cell(self.image_dict['ares']['stand'], row, col)
+                else:
+                    self.cells[position] = self.make_cell(self.image_dict['in_space'], row, col)
+
 
     def move_player(self, direction: str):
         x, y = self.warehouse.worker
@@ -248,83 +257,88 @@ class MainGame:
         if (next_x, next_y) in self.warehouse.walls:
             return
         if (next_x, next_y) in self.warehouse.boxes:
-            if self.try_move_box((next_x, next_y), (next_x + xy_offset[0], next_y + xy_offset[1])) == False:
+            if not self.try_move_box((next_x, next_y), (next_x + xy_offset[0], next_y + xy_offset[1])):
                 return
-        
+
         self.clean_cell(x, y)
         self.clean_cell(next_x, next_y)
 
-        self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['ares']['stand'], next_y, 500 + next_x)
-
+        self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['ares']['stand'], next_y, next_x)
         self.warehouse.worker = (next_x, next_y)
 
         if (x, y) in self.warehouse.targets:
-            self.cells[(x, y)] = self.make_cell(self.image_dict['target'], y, 500 + x)
+            self.cells[(x, y)] = self.make_cell(self.image_dict['target'], y, x)
         else:
-            self.cells[(x, y)] = self.make_cell(self.image_dict['in_space'], y, 500 + x)
+            self.cells[(x, y)] = self.make_cell(self.image_dict['in_space'], y, x)
 
-        puzzle_solve = all(z in self.warehouse.targets for z in self.warehouse.boxes)
-
-        if puzzle_solve:
+        if all(z in self.warehouse.targets for z in self.warehouse.boxes):
             print('Victory')
         
-        self.frame.pack()
+
 
     def try_move_box(self, location: tuple, next_location: tuple):
         x, y = location
         next_x, next_y = next_location
 
-        assert (x, y) in self.warehouse.boxes
-
         if (next_x, next_y) not in self.warehouse.walls and (next_x, next_y) not in self.warehouse.boxes:
             if (next_x, next_y) in self.cells:
                 self.clean_cell(next_x, next_y)
 
-            # Draw the new box position
             if (next_x, next_y) in self.warehouse.targets:
-                # Box moved to a target cell
-                self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['box_on_target'], next_y, 500 + next_x, self.get_box_weight(x, y))
+                self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['box_on_target'], next_y, next_x, self.get_box_weight(x, y))
             else:
-                # Box moved to an empty cell
-                self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['box'], next_y, 500 + next_x, self.get_box_weight(x, y))
+                self.cells[(next_x, next_y)] = self.make_cell(self.image_dict['box'], next_y, next_x, self.get_box_weight(x, y))
             
-            # Clean up old box position
             self.clean_cell(x, y)
             if (x, y) in self.warehouse.targets:
-                # Restore target cell if the box was originally on a target
-                self.cells[(x, y)] = self.make_cell(self.image_dict['target'], y, 500 + x)
+                self.cells[(x, y)] = self.make_cell(self.image_dict['target'], y, x)
             else:
-                # Otherwise, set the cell to an in_space cell
-                self.cells[(x, y)] = self.make_cell(self.image_dict['in_space'], y, 500 + x)
+                self.cells[(x, y)] = self.make_cell(self.image_dict['in_space'], y, x)
 
-            # Update box position in warehouse state
             bi = self.warehouse.boxes.index((x, y))
             self.warehouse.boxes[bi] = (next_x, next_y)
 
             return True
-
         return False
 
     def key_handler(self, event):
         if event.keysym in ('Left', 'Right', 'Up', 'Down'):
             self.move_player(event.keysym)
         if event.keysym in ('r', 'R'):
-            if self.warehouse_path:
-                self.start_level()
-            if event.keysym in ('s', 'S'):
-                if self.solution and len(self.solution) > 0:
-                    self.move_player(self.solution.pop(0))
-            if event.keysym in ('h', 'H'):
-                print('Hello World!')
+            self.clear_level()
+            self.start_level()
+    
+    def solve_puzzle(self, method: str):
+        if self.warehouse is None:
+            print("Load a warehouse!!")
+            return
+        print("Starting to analyze to find solution...")
+        t0 = time.time()
+        if method == "BFS":
+            solution, total_cost = solve_weight_sokoban_bfs(self.warehouse)
+        elif method == "DFS":
+            solution, total_cost = solve_weight_sokoban_dfs(self.warehouse)
+        elif method == "UCS":
+            solution, total_cost = solve_weight_sokoban_ucs(self.warehouse)
+        else:
+            solution, total_cost = solve_weight_sokoban_as(self.warehouse)
+        t1 = time.time()
+
+        print(f"Analysis took {t1 - t0:.6f} seconds")
+        if solution == "Impossible":
+            print("No solution found!")
+        else:
+            print(f"Solution found with a cost of {total_cost}\n", solution, '\n')
+
+
+
 
 
     def load_image(self, filepath:str, resize:tuple = None):
         path = os.path.join(self.app_root_folder, filepath)
         image = Image.open(path)
-
-        if resize != None:
+        if resize:
             image = image.resize(resize, Image.LANCZOS)
-
         return ImageTk.PhotoImage(image)
 
 class GamePage:
@@ -332,20 +346,68 @@ class GamePage:
         self.root = root
         self.app_root_folder = app_root_folder
         self.image = self.load_image(map_file, resize=(1000, 600))
+        self.font = tkFont.Font(family="ArcadeGamer", size=15)
+        
 
-        self.frame = tk.Canvas(self.root, width=1000, height=600)
-
+        # Khung chính
+        self.frame = tk.Frame(self.root)
         self.frame.pack(fill=tk.BOTH, expand=True)
 
         self.background_label = tk.Label(self.frame, image=self.image)
         self.background_label.place(x=0, y=0, relwidth=1, relheight=1)
 
+        self.dominant_color = self.get_dominant_color(map_file)
 
-        self.method = None
-
-
+        self.small_frame = tk.Frame(self.frame, width=250, height=250, bg=self.dominant_color)
+        self.small_frame.place(x=50, y=0, anchor="nw", width=250, height=250)
+        
         self.draw_game_controls()
         self.draw_map()
+
+    def get_dominant_color(self, image_path):
+        image = Image.open(image_path)
+
+        # Chuyển đổi ảnh sang RGB
+        image = image.convert("RGB")
+        
+        # Lấy kích thước và pixel
+        width, height = image.size
+
+        top_half = image.crop((0, 0, width, height // 2))
+
+        pixels = top_half.getdata()
+        
+        # Tính màu trung bình
+        r, g, b = 0, 0, 0
+        for pixel in pixels:
+            r += pixel[0]
+            g += pixel[1]
+            b += pixel[2]
+        
+        total_pixels = len(pixels)
+        if total_pixels > 0:
+            r //= total_pixels
+            g //= total_pixels
+            b //= total_pixels
+
+        # Trả về màu ở định dạng hex
+        return f'#{r:02x}{g:02x}{b:02x}'
+
+    def hex_to_rgb(self, hex_color):
+        # Nếu màu hex bắt đầu với '#', loại bỏ nó
+        hex_color = hex_color.lstrip('#')
+        
+        # Chuyển đổi hex thành các giá trị r, g, b
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        
+        return (r, g, b)
+
+    def get_text_color(self, dominant_color):
+        r, g, b = self.hex_to_rgb(dominant_color)
+        brightness = 0.299 * r + 0.587 * g + 0.114 * b
+        return 'black' if brightness > 128 else 'white'
 
     def load_image(self, filepath:str, resize:tuple = None):
         path = os.path.join(self.app_root_folder, filepath)
@@ -356,110 +418,80 @@ class GamePage:
 
         return ImageTk.PhotoImage(image)
 
-    # def init_info_panel(self):
-    #     title_label = tk.Label(self.frame, 
-    #                           text="Game Information", 
-    #                           font=('Arial', 16, 'bold'),
-    #                           bg='#f0f0f0')
-    #     title_label.pack(pady=20)
-        
-    #     info_frame = tk.Frame(self.left_frame, bg='#f0f0f0')
-    #     info_frame.pack(fill=tk.X, padx=20)
-        
-    #     level_label = tk.Label(info_frame, 
-    #                          text="Current Level: 1",
-    #                          font=('Arial', 12),
-    #                          bg='#f0f0f0')
-    #     level_label.pack(anchor='w', pady=5)
-        
-    #     self.moves_label = tk.Label(info_frame,
-    #                               text="Moves: 0",
-    #                               font=('Arial', 12),
-    #                               bg='#f0f0f0')
-    #     self.moves_label.pack(anchor='w', pady=5)
-        
-    #     self.method_label = tk.Label(info_frame,
-    #                                text="Selected Method: None",
-    #                                font=('Arial', 12),
-    #                                bg='#f0f0f0')
-    #     self.method_label.pack(anchor='w', pady=5)
-
-
     def draw_game_controls(self):
-        game_control = tk.Menu(self.root)
-        self.root.config(menu=game_control)
+        text_color = self.get_text_color(self.dominant_color)
+        control_label = tk.Label(self.small_frame, text="GAME CONTROLS", bg=self.dominant_color, font=(self.font, 20, 'bold'), fg=text_color)
+        control_label.pack(pady=5)
+        
+        self.algorithm_label = tk.Label(self.small_frame, text="ALGORITHMS: UNKNOWN", bg=self.dominant_color, font=(self.font, 14, 'bold'), fg=text_color)
+        self.algorithm_label.pack(pady=5)
 
-        # Menu Options
-        option_control = tk.Menu(game_control, tearoff=0)
-        game_control.add_cascade(label='Options', menu=option_control)
-        option_control.add_command(label='Restart', command=self.restart_game)
-        option_control.add_separator()
-        option_control.add_command(label='Quit', command=self.quit_game)
 
-        # Menu Solve
-        solve_control = tk.Menu(game_control, tearoff=0)
-        game_control.add_cascade(label='Solve', menu=solve_control)
+        button_frame = tk.Frame(self.small_frame, bg=self.dominant_color)
+        button_frame.pack(pady=5)
 
-        # Submenu Methods
-        methods_menu = tk.Menu(solve_control, tearoff=0)
+        restart_button = tk.Button(button_frame, text="Restart", command=self.restart_game, font=(self.font, 10), cursor="hand2")
+        restart_button.pack(side=tk.LEFT, padx=5)
+
+        quit_button = tk.Button(button_frame, text="Quit", command=self.quit_game, font=(self.font, 10), cursor="hand2")
+        quit_button.pack(side=tk.LEFT, padx=5)
+
+        solve_button = tk.Button(self.small_frame, text="Solve", font=(self.font, 10), cursor="hand2")
+        solve_button.pack(pady=5)
+
+        self.solve_menu = tk.Menu(solve_button, tearoff=0)
+        methods_menu = tk.Menu(self.solve_menu, tearoff=0)
         methods_menu.add_command(label="BFS", command=lambda: self.set_method("BFS"))
         methods_menu.add_command(label="DFS", command=lambda: self.set_method("DFS"))
         methods_menu.add_command(label="UCS", command=lambda: self.set_method("UCS"))
         methods_menu.add_command(label="A*", command=lambda: self.set_method("A*"))
 
-        solve_control.add_cascade(label="Methods", menu=methods_menu)
+        self.solve_menu.add_cascade(label="Methods", menu=methods_menu)
+        self.solve_menu.add_command(label="Plan Action Sequence", command=self.plan_action_sequence, state='disabled')
+        self.solve_menu.add_command(label="Play Action Sequence", command=self.play_action_sequence, state='disabled')
 
-        solve_control.add_command(label="Plan Action Sequence", command=self.plan_action_sequence, state='disabled')
-        solve_control.add_command(label="Play Action Sequence", command=self.play_action_sequence, state='disabled')
+        self.plan_action_index = 0
+        self.play_action_index = 1
         
-        self.solve_control = solve_control
-        self.plan_action_index = self.solve_control.index("Plan Action Sequence")
-        self.play_action_index = self.solve_control.index("Play Action Sequence")
+        solve_button.config(command=lambda: self.solve_menu.post(solve_button.winfo_rootx(), solve_button.winfo_rooty() + solve_button.winfo_height()))
+
+        for button in (restart_button, solve_button, quit_button):
+            button.config(width=7)
+
+    def draw_map(self):
+        warehouse_path = r"./warehouses/input_10_10_2_8.txt"
+        self.main_game = MainGame(self.frame, {}, self.root, self.app_root_folder, warehouse_path)
+        self.root.bind_all("<Key>", self.main_game.key_handler)
+        self.main_game.start_level()
 
 
     def set_method(self, method):
         self.method = method
-        self.solve_control.entryconfig(self.plan_action_index, state="normal")
-        self.solve_control.entryconfig(self.play_action_index, state="normal")
+        self.algorithm_label.config(text=f"ALGORITHM: {self.method}")
+        self.solve_menu.entryconfig(self.plan_action_index, state="normal")
+        self.solve_menu.entryconfig(self.play_action_index, state="normal")
 
     def plan_action_sequence(self):
         if self.method:
             print("Planning action sequence with", self.method)
+            self.main_game.solve_puzzle(self.method)
 
     def play_action_sequence(self):
         if self.method:
             print("Playing action sequence with", self.method)
 
-    def quit_game(self):
-        self.method = None
-        self.canvas.destroy()
-
-        print("Quit game")
-
-
-    def draw_map(self):
-        warehouse = Warehouse()
-        warehouse.load_warehouse(r"./warehouses/input_10_10_2_4.txt")
-        self.main_game = MainGame(self.frame, {}, self.root, self.app_root_folder, warehouse)
-        self.root.bind_all("<Key>", self.main_game.key_handler)
+    def restart_game(self):
+        print("Game Restarted")
+        self.main_game.clear_level()
         self.main_game.start_level()
 
+    def solve(self):
+        print(f"Solving with {self.method}")
 
-    def restart_game(self):
-        # Code to restart the game
-        pass
 
-    def start_game(self):
-        self.method = None
-
-        self.root.nametowidget(self.plan_action).config(state="disabled")
-        self.root.nametowidget(self.play_action).config(state="disabled")
-        # Code to start the game
-        pass
-
-    def solve(self, algorithm):
-        # Code to solve with the chosen algorithm
-        print(f"Solving with {algorithm}")
+    def quit_game(self):
+        self.frame.destroy()
+        Home(self.root, self.app_root_folder)
 
 class Home:
     def __init__(self, root, app_root_folder):
@@ -553,13 +585,6 @@ class Home:
 
     def stop_animation(self):
         self.animation_running = False
-
-direction_offset = {
-    'Left': (-1, 0),
-    'Right': (1, 0),
-    'Up': (0, -1),
-    'Down': (0, 1)
-}
 
 if __name__ == '__main__':
     root  = tk.Tk()
