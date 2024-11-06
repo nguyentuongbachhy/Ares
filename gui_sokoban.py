@@ -10,24 +10,37 @@ __author__ = "Quatermelon"
 __version__ = "1.0"
 
 class AboutPage:
-    def __init__(self, root):
+    def __init__(self, root, app_root_folder):
         self.root = root
-        self.frame = tk.Frame(self.root, bg="white")
-        self.frame.place(relwidth=1, relheight=1)
+        self.app_root_folder = app_root_folder
         
-        label = tk.Label(self.frame, text="About the Sokoban Game", font=("Arial", 24), bg="white")
-        label.pack(pady=20)
+        # Sử dụng Canvas thay vì Frame
+        self.canvas = tk.Canvas(self.root, bg="white", width=1000, height=600)
+        self.canvas.place(relwidth=1, relheight=1)  # Đặt canvas phủ toàn bộ màn hình
+
+        # Tải ảnh nền
+        self.image = self.load_image("images/background/about/about.png", (1000, 600))
         
-        text = "This is a simple Sokoban game where you move boxes to storage locations. Enjoy playing!"
-        text_label = tk.Label(self.frame, text=text, font=("Arial", 14), bg="white", wraplength=800)
-        text_label.pack(pady=20)
+        # Vẽ ảnh nền lên Canvas
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.image)
         
-        back_button = tk.Button(self.frame, text="Back", command=self.back_to_home)
-        back_button.pack(pady=20)
+        # Tạo nút "Back" sử dụng Canvas
+        back_button = tk.Button(self.root, text="Back", command=self.back_to_home, font=("Arial", 14, "bold"))
+        back_button_window = self.canvas.create_window(500, 550, window=back_button)  # Đặt nút tại vị trí (500, 550)
     
+    def load_image(self, filepath: str, resize: tuple = None):
+        path = os.path.join(self.app_root_folder, filepath)
+        image = Image.open(path).convert('RGBA')
+
+        if resize:
+            image = image.resize(resize, Image.LANCZOS)
+
+        return ImageTk.PhotoImage(image)
+
     def back_to_home(self):
-        self.frame.destroy()
-        Home(self.root, app_root_folder)
+        self.canvas.destroy()  # Xóa canvas hiện tại
+        Home(self.root, self.app_root_folder) 
+
 
 class MapView:
     def __init__(self, app_root_folder, map_file, parent_canvas, on_click_callback):
@@ -669,7 +682,7 @@ class Home:
     def go_to_about(self):
         self.stop_animation()
         self.canvas.destroy()
-        AboutPage(self.root)
+        AboutPage(self.root, self.app_root_folder)
 
     def add_press_effect(self, button):
         def on_press(event):
