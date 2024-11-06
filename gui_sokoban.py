@@ -29,19 +29,31 @@ class AboutPage:
         self.frame.destroy()
         Home(self.root, app_root_folder)
 
+class MapView:
+    def __init__(self, map_file):
+        self.map_file = map_file
+
+        
+
 class OptionsPage:
     def __init__(self, root, app_root_folder):
         self.root = root
         self.app_root_folder = app_root_folder
         self.maps = self.load_maps()
         self.current_page = 0
+        self.clouds = []
+        self.clouds_position = [0, 750, 1000]
+        self.cloud_speed = 2
+        self.animation_running = True
+
 
         self.image_dict = {
             'background': self.load_image('images/background/options/background.png', resize=(1000, 600)),
             'title': self.load_image('images/background/options/title.png', resize=(300, 25)),
             'next': self.load_image('images/background/util/next.png', resize=(30, 50)),
             'prev': self.load_image('images/background/util/prev.png', resize=(30, 50)),
-            'back': self.load_image('images/background/util/back.png', resize=(75, 50))
+            'back': self.load_image('images/background/util/back.png', resize=(75, 50)),
+            'clouds': [self.load_image(f'images/background/util/cloud/{i}.png') for i in range(3)],
         }
 
         self.canvas = tk.Canvas(self.root, width=1000, height=600)
@@ -55,8 +67,32 @@ class OptionsPage:
         self.canvas.tag_bind(self.back_button, "<Enter>", lambda event: self.canvas.config(cursor='hand2'))
         self.canvas.tag_bind(self.back_button, "<Leave>", lambda event: self.canvas.config(cursor=''))
 
+        self.draw_clouds()
+        self.animate_clouds()
+
         self.show_map_options()
     
+    def draw_clouds(self):
+        for i in range(3):
+            cloud = self.canvas.create_image(self.clouds_position[i], 100, anchor=tk.CENTER, image = self.image_dict['clouds'][i])
+            self.clouds.append(cloud)
+
+    def animate_clouds(self):
+        if not self.animation_running or not self.canvas:
+            return
+        for i in range(3):
+            self.canvas.move(self.clouds[i], self.cloud_speed, 0)
+            pos = self.canvas.coords(self.clouds[i])[0]
+
+            if pos > 1920:
+                self.canvas.move(self.clouds[i], -1920 - 100, 0)
+
+        self.root.after(50, self.animate_clouds)
+
+    def stop_animation(self):
+        self.animation_running = False
+
+
     def load_image(self, filepath:str, resize:tuple = None, rounded_corners = False, radius = 20):
         path = os.path.join(self.app_root_folder, filepath)
         image = Image.open(path).convert('RGBA')
@@ -137,10 +173,12 @@ class OptionsPage:
         self.show_map_options()
 
     def go_back(self):
+        self.stop_animation()
         self.canvas.destroy()
         Home(self.root, self.app_root_folder)
 
     def start_game(self, map_file):
+        self.stop_animation()
         self.canvas.destroy()
         GamePage(self.root, self.app_root_folder, map_file)
 
@@ -160,7 +198,7 @@ class MainGame:
         grid_height = self.warehouse.nrows * self.cell_size
 
         self.grid_frame = tk.Frame(self.parent_frame, width=grid_width, height=grid_height)
-        self.grid_frame.place(x = 900 - grid_width, y=0, width=grid_width, height=grid_height)
+        self.grid_frame.place(x = 900 - grid_width, y=10, width=grid_width, height=grid_height)
 
 
         self.image_dict = {
@@ -176,15 +214,17 @@ class MainGame:
             'box_on_target': self.load_image('images/cell/right_box.png', (50, 50)),
             'target': self.load_image('images/cell/dock.png', (50, 50)),
             'in_space': self.load_image('images/cell/in_space.png', (50, 50)),
-            'out_space': self.load_image('images/cell/out_space.png', (50, 50))
+            'out_space': self.load_image('images/cell/out_space.png', (50, 50)),
+            'victory_title': self.load_image('images/background/util/victory.png', (740, 100))
         }
         
         self.direction_offset = {
-            'l': (-1, 0),
-            'r': (1, 0),
-            'u': (0, -1),
-            'd': (0, 1)
+            'Left': (-1, 0),
+            'Right': (1, 0),
+            'Up': (0, -1),
+            'Down': (0, 1)
         }
+
 
     def load_warehouse(self, warehouse_path: str):
         try:
@@ -249,6 +289,14 @@ class MainGame:
 
 
     def move_player(self, direction: str):
+        map_direction = {
+            'l': 'Left',
+            'r': 'Right',
+            'u': 'Up',
+            'd': 'Down'
+        }
+        if direction in map_direction.keys():
+            direction = map_direction[direction]
         x, y = self.warehouse.worker
         xy_offset = self.direction_offset[direction]
         next_x, next_y = x + xy_offset[0], y + xy_offset[1]
@@ -271,8 +319,23 @@ class MainGame:
             self.cells[(x, y)] = self.make_cell(self.image_dict['in_space'], y, x)
 
         if all(z in self.warehouse.targets for z in self.warehouse.boxes):
-            print('Victory')
+            self.show_victory_screen()
         
+
+
+    def show_victory_screen(self):
+        self.canvas = tk.Canvas(self.parent_frame, width=1000, height=600, highlightthickness=0, bg='black')
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+
+        self.canvas.create_image(130, 200, anchor=tk.NW, image=self.image_dict['victory_title'])
+        back_button = tk.Button(self.parent_frame, text="Back", command=self.destroy_canvas, cursor='hand2', width=20, pady=5, font=(self.font, 20, 'bold'))
+        self.canvas.create_window(490, 400, window=back_button)
+
+    def destroy_canvas(self):
+        self.canvas.destroy()
+        self.grid_frame.destroy()
+        self.parent_frame.destroy()
+        Home(self.root, self.app_root_folder)
 
 
     def try_move_box(self, location: tuple, next_location: tuple):
