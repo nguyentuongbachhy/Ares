@@ -158,12 +158,12 @@ def graph_search(problem, frontier):
     while frontier:
         node = frontier.pop()
         if problem.goal_test(node.state):
-            return node
+            return node, frontier
         explored.add(node.state)
         frontier.extend(child for child in node.expand(problem)
                         if child.state not in explored
                         and child not in frontier)
-    return None
+    return None, frontier
 
 
 def breadth_first_search(problem):
@@ -182,7 +182,7 @@ def best_first_graph_search(problem, f):
     while frontier:
         node = frontier.pop()
         if problem.goal_test(node.state):
-            return node
+            return node, frontier
         explored.add(node.state)
         for child in node.expand(problem):
             if child.state not in explored and child not in frontier:
@@ -191,7 +191,7 @@ def best_first_graph_search(problem, f):
                 if f(child) < frontier[child]:
                     del frontier[child]
                     frontier.append(child)
-    return None
+    return None, frontier
 
 
 def uniform_cost_search(problem):

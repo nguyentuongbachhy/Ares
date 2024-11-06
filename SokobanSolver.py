@@ -293,13 +293,13 @@ def solve_weight_sokoban_bfs(warehouse: Warehouse):
     
     sp = SokobanPuzzle(warehouse, taboocells)
 
-    solve_bfs = Search.breadth_first_search(sp)
+    solve_bfs, frontier = Search.breadth_first_search(sp)
 
     if solve_bfs is None:
         return 'Impossible', None
     seq_bfs = sp.get_seq_from_goalnode(solve_bfs)
 
-    return seq_bfs, solve_bfs.path_cost
+    return seq_bfs, solve_bfs.path_cost, frontier
 
 
 
@@ -313,13 +313,13 @@ def solve_weight_sokoban_dfs(warehouse: Warehouse):
     
     sp = SokobanPuzzle(warehouse, taboocells)
 
-    solve_dfs = Search.depth_first_search(sp)
+    solve_dfs, frontier = Search.depth_first_search(sp)
 
     if solve_dfs is None:
         return 'Impossible', None
     seq_dfs = sp.get_seq_from_goalnode(solve_dfs)
 
-    return seq_dfs, solve_dfs.path_cost
+    return seq_dfs, solve_dfs.path_cost, frontier
 
 def solve_weight_sokoban_ucs(warehouse: Warehouse):
     taboocells = find_taboo_cells(warehouse)
@@ -331,13 +331,13 @@ def solve_weight_sokoban_ucs(warehouse: Warehouse):
     
     sp = SokobanPuzzle(warehouse, taboocells)
 
-    solve_ucs = Search.uniform_cost_search(sp)
+    solve_ucs, frontier = Search.uniform_cost_search(sp)
 
     if solve_ucs is None:
         return 'Impossible', None
     seq_ucs = sp.get_seq_from_goalnode(solve_ucs)
 
-    return seq_ucs, solve_ucs.path_cost
+    return seq_ucs, solve_ucs.path_cost, frontier
 
 def solve_weight_sokoban_as(warehouse: Warehouse):
     taboocells = find_taboo_cells(warehouse)
@@ -349,11 +349,11 @@ def solve_weight_sokoban_as(warehouse: Warehouse):
     
     sp = SokobanPuzzle(warehouse, taboocells)
 
-    solve_as = Search.astar_search(sp)
+    solve_as, frontier = Search.astar_search(sp)
 
     if solve_as is None:
         return 'Impossible', None
     seq_as = sp.get_seq_from_goalnode(solve_as)
 
-    return seq_as, solve_as.path_cost
+    return seq_as, solve_as.path_cost, frontier
 
